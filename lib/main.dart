@@ -80,9 +80,27 @@ class _OCRHomePageState extends State<OCRHomePage> {
 
   Future<void> _translateText() async {
     final translator = GoogleTranslator();
-    final text = _recognizedLines.join("\n");
-    final translation = await translator.translate(text, to: 'vi');
-    setState(() => _translatedText = translation.text);
+    final text = _recognizedLines.join(" ");
+
+    final vi = await translator.translate(text, to: 'vi');
+    final en = await translator.translate(text, to: 'en');
+    final zh = await translator.translate(text, to: 'zh-cn');
+    final ja = await translator.translate(text, to: 'ja');
+
+    setState(
+      () =>
+          _translatedText = '''🇻🇳 Vietnamese:
+${vi.text}
+
+🇬🇧 English:
+${en.text}
+
+🇨🇳 Chinese:
+${zh.text}
+
+🇯🇵 Japanese:
+${ja.text}''',
+    );
   }
 
   @override
@@ -112,7 +130,7 @@ class _OCRHomePageState extends State<OCRHomePage> {
                 _recognizedLines.isNotEmpty
                     ? () {
                       Clipboard.setData(
-                        ClipboardData(text: _recognizedLines.join("\n")),
+                        ClipboardData(text: _recognizedLines.join(" ")),
                       );
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Đã sao chép văn bản.')),
