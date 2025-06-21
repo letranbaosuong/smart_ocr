@@ -37,6 +37,13 @@ class _OCRHomePageState extends State<OCRHomePage> {
   bool _loading = false;
   final ImagePicker _picker = ImagePicker();
   String _translatedText = '';
+  final Map<String, String> _languageCodes = {
+    'Tiếng Việt': 'vi',
+    'English': 'en',
+    '中文 (简体)': 'zh-cn',
+    '日本語': 'ja',
+  };
+  String _selectedLanguage = 'vi';
 
   Future<void> _getImage(ImageSource source) async {
     setState(() {
@@ -78,29 +85,40 @@ class _OCRHomePageState extends State<OCRHomePage> {
     }
   }
 
+  String _translateTarget(String lang) {
+    switch (lang) {
+      case 'vi':
+        return '🇻🇳 Vietnamese:';
+      case 'en':
+        return '🇬🇧 English:';
+      case 'zh-cn':
+        return '🇨🇳 Chinese:';
+      case 'ja':
+        return '🇯🇵 Japanese:';
+      default:
+        return '';
+    }
+  }
+
   Future<void> _translateText() async {
     final translator = GoogleTranslator();
     final text = _recognizedLines.join(" ");
+    try {
+      final translation = await translator.translate(
+        text,
+        to: _selectedLanguage,
+      );
 
-    final vi = await translator.translate(text, to: 'vi');
-    final en = await translator.translate(text, to: 'en');
-    final zh = await translator.translate(text, to: 'zh-cn');
-    final ja = await translator.translate(text, to: 'ja');
-
-    setState(
-      () =>
-          _translatedText = '''🇻🇳 Vietnamese:
-${vi.text}
-
-🇬🇧 English:
-${en.text}
-
-🇨🇳 Chinese:
-${zh.text}
-
-🇯🇵 Japanese:
-${ja.text}''',
-    );
+      setState(() => _translatedText = translation.text);
+    } catch (e) {
+      setState(() {
+        _translatedText = 'Lỗi dịch: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -109,10 +127,39 @@ ${ja.text}''',
       appBar: AppBar(
         title: const Text('Smart OCR'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.translate),
-            onPressed: _recognizedLines.isNotEmpty ? _translateText : null,
-            tooltip: 'Dịch văn bản',
+          IgnorePointer(
+            ignoring: _recognizedLines.isEmpty || _loading,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 8),
+                  const Icon(Icons.translate, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: _selectedLanguage,
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          _selectedLanguage = newValue;
+                          _translateText();
+                        });
+                      }
+                    },
+                    items:
+                        _languageCodes.entries.map((entry) {
+                          return DropdownMenuItem<String>(
+                            value: entry.value,
+                            child: Text(entry.key),
+                          );
+                        }).toList(),
+                  ),
+                ],
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.share),
@@ -133,7 +180,9 @@ ${ja.text}''',
                         ClipboardData(text: _recognizedLines.join(" ")),
                       );
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Đã sao chép văn bản.')),
+                        const SnackBar(
+                          content: Text('Đã sao chép văn bản gốc.'),
+                        ),
                       );
                     }
                     : null,
@@ -192,9 +241,37 @@ ${ja.text}''',
                       ),
                       if (_translatedText.isNotEmpty) ...[
                         const Divider(),
-                        const Text(
-                          "\n\u{1F1FA}\u{1F1F8} Dịch sang tiếng Việt:",
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                "\u{1F5E3} Dịch sang ${_translateTarget(_selectedLanguage)}",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy),
+                              onPressed:
+                                  _recognizedLines.isNotEmpty
+                                      ? () {
+                                        Clipboard.setData(
+                                          ClipboardData(text: _translatedText),
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Đã sao chép văn bản dịch.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                      : null,
+                              tooltip: 'Sao chép',
+                            ),
+                          ],
                         ),
                         Text(
                           _translatedText,
