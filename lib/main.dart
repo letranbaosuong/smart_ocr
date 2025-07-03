@@ -174,6 +174,66 @@ class _OCRHomePageState extends State<OCRHomePage> {
     }
   }
 
+  Widget _buildToolResultText({bool isOriginal = true}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4.0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed:
+                _recognizedLines.isNotEmpty
+                    ? () => SharePlus.instance.share(
+                      ShareParams(
+                        text:
+                            isOriginal
+                                ? _recognizedLines.join(" ")
+                                : _translatedText,
+                      ),
+                    )
+                    : null,
+            tooltip: 'Chia sẻ',
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy),
+            onPressed:
+                _recognizedLines.isNotEmpty
+                    ? () {
+                      Clipboard.setData(
+                        ClipboardData(
+                          text:
+                              isOriginal
+                                  ? _recognizedLines.join(" ")
+                                  : _translatedText,
+                        ),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Đã sao chép văn bản ${isOriginal ? 'gốc' : 'dịch'}.',
+                          ),
+                        ),
+                      );
+                    }
+                    : null,
+            tooltip: 'Sao chép',
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -214,128 +274,97 @@ class _OCRHomePageState extends State<OCRHomePage> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed:
-                _recognizedLines.isNotEmpty
-                    ? () => SharePlus.instance.share(
-                      ShareParams(text: _recognizedLines.join(" ")),
-                    )
-                    : null,
-            tooltip: 'Chia sẻ',
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy),
-            onPressed:
-                _recognizedLines.isNotEmpty
-                    ? () {
-                      Clipboard.setData(
-                        ClipboardData(text: _recognizedLines.join(" ")),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Đã sao chép văn bản gốc.'),
-                        ),
-                      );
-                    }
-                    : null,
-            tooltip: 'Sao chép',
-          ),
+          const SizedBox(width: 16),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _image != null
-                ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(_image!, height: 200),
-                )
-                : Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(child: Text('Chưa có ảnh')),
-                ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               children: [
-                FilledButton.tonalIcon(
-                  onPressed: () => _getImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Chụp ảnh'),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: () => _getImage(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Thư viện'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _loading
-                ? const CircularProgressIndicator()
-                : Expanded(
-                  child: ListView(
-                    children: [
-                      ..._recognizedLines.map(
-                        (line) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                          child: Text(
-                            line,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ),
+                _image != null
+                    ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(_image!, height: 200),
+                    )
+                    : Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color:
+                            Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      if (_translatedText.isNotEmpty) ...[
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
+                      child: const Center(child: Text('Chưa có ảnh')),
+                    ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    FilledButton.tonalIcon(
+                      onPressed: () => _getImage(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('Chụp ảnh'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _getImage(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library),
+                      label: const Text('Thư viện'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _loading
+                    ? const CircularProgressIndicator()
+                    : Expanded(
+                      child: ListView(
+                        children: [
+                          ..._recognizedLines.map(
+                            (line) => Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 4.0,
+                              ),
                               child: Text(
-                                "\u{1F5E3} Dịch sang ${_translateTarget(_selectedLanguageTranslateTarget)}",
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                line,
+                                style: const TextStyle(fontSize: 16),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.copy),
-                              onPressed:
-                                  _recognizedLines.isNotEmpty
-                                      ? () {
-                                        Clipboard.setData(
-                                          ClipboardData(text: _translatedText),
-                                        );
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Đã sao chép văn bản dịch.',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                      : null,
-                              tooltip: 'Sao chép',
+                          ),
+                          if (_translatedText.isNotEmpty) ...[
+                            const Divider(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    "\u{1F5E3} Dịch sang ${_translateTarget(_selectedLanguageTranslateTarget)}",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                _buildToolResultText(isOriginal: false),
+                              ],
+                            ),
+                            Text(
+                              _translatedText,
+                              style: const TextStyle(color: Colors.teal),
                             ),
                           ],
-                        ),
-                        Text(
-                          _translatedText,
-                          style: const TextStyle(color: Colors.teal),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-          ],
-        ),
+                        ],
+                      ),
+                    ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: _buildToolResultText(isOriginal: true),
+          ),
+        ],
       ),
     );
   }
