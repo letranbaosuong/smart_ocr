@@ -3,11 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:translator/translator.dart';
+import 'langdetect/flutter_langdetect.dart' as langdetect;
 
-void main() => runApp(const SmartOCRApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const SmartOCRApp());
+}
 
 class SmartOCRApp extends StatelessWidget {
   const SmartOCRApp({super.key});
@@ -40,10 +44,45 @@ class _OCRHomePageState extends State<OCRHomePage> {
   final Map<String, String> _languageCodes = {
     'Tiếng Việt': 'vi',
     'English': 'en',
-    '中文 (简体)': 'zh-cn',
+    '中文 (简体)': 'zh',
     '日本語': 'ja',
   };
-  String _selectedLanguage = 'vi';
+  String _selectedLanguageTranslateTarget = 'vi';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeTranslator();
+  }
+
+  Future<void> _initializeTranslator() async {
+    await langdetect.initLangDetect();
+    final modelManager = OnDeviceTranslatorModelManager();
+    bool isEnglishDownloaded = await modelManager.isModelDownloaded(
+      TranslateLanguage.english.bcpCode,
+    );
+    bool isVietnameseDownloaded = await modelManager.isModelDownloaded(
+      TranslateLanguage.vietnamese.bcpCode,
+    );
+    bool isJapaneseDownloaded = await modelManager.isModelDownloaded(
+      TranslateLanguage.japanese.bcpCode,
+    );
+    bool isChineseDownloaded = await modelManager.isModelDownloaded(
+      TranslateLanguage.chinese.bcpCode,
+    );
+    if (!isEnglishDownloaded) {
+      await modelManager.downloadModel(TranslateLanguage.english.bcpCode);
+    }
+    if (!isVietnameseDownloaded) {
+      await modelManager.downloadModel(TranslateLanguage.vietnamese.bcpCode);
+    }
+    if (!isJapaneseDownloaded) {
+      await modelManager.downloadModel(TranslateLanguage.japanese.bcpCode);
+    }
+    if (!isChineseDownloaded) {
+      await modelManager.downloadModel(TranslateLanguage.chinese.bcpCode);
+    }
+  }
 
   Future<void> _getImage(ImageSource source) async {
     setState(() {
@@ -91,7 +130,7 @@ class _OCRHomePageState extends State<OCRHomePage> {
         return '🇻🇳 Vietnamese:';
       case 'en':
         return '🇬🇧 English:';
-      case 'zh-cn':
+      case 'zh':
         return '🇨🇳 Chinese:';
       case 'ja':
         return '🇯🇵 Japanese:';
@@ -100,16 +139,30 @@ class _OCRHomePageState extends State<OCRHomePage> {
     }
   }
 
-  Future<void> _translateText() async {
-    final translator = GoogleTranslator();
-    final text = _recognizedLines.join(" ");
+  TranslateLanguage? fromRawValue(String bcpCode) {
     try {
-      final translation = await translator.translate(
-        text,
-        to: _selectedLanguage,
+      return TranslateLanguage.values.firstWhere(
+        (element) => element.bcpCode == bcpCode,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _translateText() async {
+    final text = _recognizedLines.join(" ");
+    final languageOrginalDetect = langdetect.detect(text);
+    try {
+      final translation = OnDeviceTranslator(
+        sourceLanguage:
+            fromRawValue(languageOrginalDetect) ?? TranslateLanguage.english,
+        targetLanguage:
+            fromRawValue(_selectedLanguageTranslateTarget) ??
+            TranslateLanguage.vietnamese,
       );
 
-      setState(() => _translatedText = translation.text);
+      _translatedText = await translation.translateText(text);
+      setState(() {});
     } catch (e) {
       setState(() {
         _translatedText = 'Lỗi dịch: ${e.toString()}';
@@ -140,11 +193,11 @@ class _OCRHomePageState extends State<OCRHomePage> {
                   const Icon(Icons.translate, color: Colors.blue),
                   const SizedBox(width: 8),
                   DropdownButton<String>(
-                    value: _selectedLanguage,
+                    value: _selectedLanguageTranslateTarget,
                     onChanged: (String? newValue) {
                       if (newValue != null) {
                         setState(() {
-                          _selectedLanguage = newValue;
+                          _selectedLanguageTranslateTarget = newValue;
                           _translateText();
                         });
                       }
@@ -246,7 +299,7 @@ class _OCRHomePageState extends State<OCRHomePage> {
                           children: [
                             Flexible(
                               child: Text(
-                                "\u{1F5E3} Dịch sang ${_translateTarget(_selectedLanguage)}",
+                                "\u{1F5E3} Dịch sang ${_translateTarget(_selectedLanguageTranslateTarget)}",
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
